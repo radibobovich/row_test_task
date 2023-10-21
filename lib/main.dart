@@ -42,30 +42,12 @@ class _ResizeableRowState extends State<ResizeableRow>
     super.initState();
   }
 
-  /// Used to make dash line appear again because as soon [lineWidth] goes
-  /// smaller than 10, [setState] is not being called anymore so we need
-  /// to do it on screen change
-  @override
-  void didChangeMetrics() {
-    RenderBox? renderBox;
-    if (_key.currentContext?.findRenderObject() != null) {
-      renderBox = _key.currentContext!.findRenderObject() as RenderBox;
-      final currentTextWidth = renderBox.size.width;
-      if (currentTextWidth > textWidth && lineWidth < 10) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          setState(() {
-            lineWidth = 11;
-          });
-        });
-      }
-      textWidth = currentTextWidth;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
+        /// Text cell
+
         Flexible(
             flex: lineWidth > 10 ? 0 : 1,
             child: Container(
@@ -82,6 +64,8 @@ class _ResizeableRowState extends State<ResizeableRow>
                 overflow: TextOverflow.ellipsis,
               ),
             )),
+
+        /// Dash cell
         Builder(builder: (context) {
           if (lineWidth > 10) {
             return Expanded(
@@ -118,6 +102,8 @@ class _ResizeableRowState extends State<ResizeableRow>
             );
           }
         }),
+
+        /// Checkbox cell
         Container(
           height: rowHeight,
           decoration: const BoxDecoration(
@@ -127,15 +113,35 @@ class _ResizeableRowState extends State<ResizeableRow>
                   right: BorderSide())),
           child: Checkbox(
             value: selected,
-            onChanged: (value) {
+            onChanged: (newValue) {
               setState(() {
-                selected = value ?? !selected;
+                selected = newValue!;
               });
             },
           ),
         )
       ],
     );
+  }
+
+  /// Used to make dash line appear again because as soon [lineWidth] goes
+  /// smaller than 10, [setState] is not being called anymore so we need
+  /// to do it on screen change
+  @override
+  void didChangeMetrics() {
+    RenderBox? renderBox;
+    if (_key.currentContext?.findRenderObject() != null) {
+      renderBox = _key.currentContext!.findRenderObject() as RenderBox;
+      final currentTextWidth = renderBox.size.width;
+      if (currentTextWidth > textWidth && lineWidth < 10) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setState(() {
+            lineWidth = 11;
+          });
+        });
+      }
+      textWidth = currentTextWidth;
+    }
   }
 }
 
