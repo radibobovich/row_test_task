@@ -4,4 +4,4 @@
 
 Пример работы:
 
-<img src="demo.gif" width="400" />
+<img src="demo.gif" width="800" />
