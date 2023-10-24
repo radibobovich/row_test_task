@@ -30,16 +30,62 @@ class ResizeableRow extends StatefulWidget {
 class _ResizeableRowState extends State<ResizeableRow>
     with WidgetsBindingObserver {
   late bool selected;
-  double lineWidth = double.infinity;
-  double textWidth = double.infinity;
-
+  late double textMaxWidth;
+  double lineWidth = 1000;
+  int textFlex = 0;
+  int lineFlex = 1;
+  final GlobalKey _textKey = GlobalKey();
   static const double rowHeight = 25;
-  final GlobalKey _key = GlobalKey();
+
   @override
   void initState() {
     selected = widget.selected;
+    textMaxWidth = calculateTextMaxWidth();
     WidgetsBinding.instance.addObserver(this);
+
+    /// In case initial text is larger than needed
+    WidgetsBinding.instance.addPostFrameCallback((_) => didChangeMetrics());
+
     super.initState();
+  }
+
+  @override
+  void didChangeMetrics() {
+    RenderBox? renderBox;
+    if (_textKey.currentContext?.findRenderObject() != null) {
+      renderBox = _textKey.currentContext!.findRenderObject() as RenderBox;
+      final textRenderWidth = renderBox.size.width;
+      if (textRenderWidth >= textMaxWidth && textFlex == 1) {
+        /// on expand
+        setState(() {
+          textFlex = 0;
+          lineFlex = 1;
+        });
+      } else if ((lineWidth < 10) && textFlex == 0) {
+        /// on shrink
+        setState(() {
+          textFlex = 1;
+          lineFlex = 0;
+        });
+      }
+    }
+  }
+
+  /// In case of text change
+  @override
+  void didUpdateWidget(covariant ResizeableRow oldWidget) {
+    textMaxWidth = calculateTextMaxWidth();
+    WidgetsBinding.instance.addPostFrameCallback((_) => didChangeMetrics());
+    super.didUpdateWidget(oldWidget);
+  }
+
+  double calculateTextMaxWidth() {
+    TextSpan textSpan = TextSpan(text: widget.text);
+    TextPainter textPainter =
+        TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+    textPainter.layout(maxWidth: double.infinity);
+
+    return textPainter.width;
   }
 
   @override
@@ -49,7 +95,7 @@ class _ResizeableRowState extends State<ResizeableRow>
         /// Text cell
 
         Flexible(
-            flex: lineWidth > 10 ? 0 : 1,
+            flex: textFlex,
             child: Container(
               height: rowHeight,
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -60,48 +106,31 @@ class _ResizeableRowState extends State<ResizeableRow>
                       left: BorderSide())),
               child: Text(
                 widget.text,
-                key: _key,
+                key: _textKey,
                 overflow: TextOverflow.ellipsis,
               ),
             )),
 
         /// Dash cell
-        Builder(builder: (context) {
-          if (lineWidth > 10) {
-            return Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (lineWidth != constraints.maxWidth) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      setState(() {
-                        lineWidth = constraints.maxWidth;
-                      });
-                    });
-                  }
-                  return Container(
-                    height: rowHeight,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(),
-                    ),
-                    child: CustomPaint(
-                      painter: DashPainter(),
-                      size: Size(lineWidth, 1),
-                    ),
-                  );
-                },
-              ),
-            );
-          } else {
-            return Container(
-              width: 10,
-              height: rowHeight,
-              decoration: const BoxDecoration(
-                  border: Border.symmetric(horizontal: BorderSide())),
-            );
-          }
-        }),
+        Expanded(
+          flex: lineFlex,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 10),
+            height: rowHeight,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border.all(),
+            ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              lineWidth = constraints.maxWidth;
+              return CustomPaint(
+                painter: DashPainter(),
+                size: Size(lineWidth == double.infinity ? 10 : lineWidth, 1),
+              );
+            }),
+          ),
+        ),
 
         /// Checkbox cell
         Container(
@@ -123,33 +152,13 @@ class _ResizeableRowState extends State<ResizeableRow>
       ],
     );
   }
-
-  /// Used to make dash line appear again because as soon [lineWidth] goes
-  /// smaller than 10, [setState] is not being called anymore so we need
-  /// to do it on screen change
-  @override
-  void didChangeMetrics() {
-    RenderBox? renderBox;
-    if (_key.currentContext?.findRenderObject() != null) {
-      renderBox = _key.currentContext!.findRenderObject() as RenderBox;
-      final currentTextWidth = renderBox.size.width;
-      if (currentTextWidth > textWidth && lineWidth < 10) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          setState(() {
-            lineWidth = 11;
-          });
-        });
-      }
-      textWidth = currentTextWidth;
-    }
-  }
 }
 
 class DashPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..strokeWidth = 1;
-
+    if (size.width <= 10) paint.color = Colors.transparent;
     const dashWidth = 4;
     const dashSpace = 4;
     double drawPoint = 0;
